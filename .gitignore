@@ -1,0 +1,82 @@
+# [System Files]
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+desktop.ini
+Thumbs.db
+
+# [IDEs]
+.vscode/
+.idea/
+*.swp
+*.swo
+.project
+.settings/
+.classpath
+
+# [Node.js / Dependencies]
+node_modules/
+bower_components/
+jspm_packages/
+.npm/
+.eslintcache
+.stylelintcache
+.node_repl_history
+*.tsbuildinfo
+
+# [Logs and Debugging]
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# [Environment Variables]
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+!.env.example
+
+# [Expo / ReactNative (Mobile)]
+mobile/.expo/
+mobile/dist/
+mobile/web-build/
+mobile/expo-env.d.ts
+mobile/ios/
+mobile/android/
+mobile/*.jks
+mobile/*.p8
+mobile/*.p12
+mobile/*.key
+mobile/*.mobileprovision
+
+# [Server (Express)]
+server/logs/
+server/config/serviceAccountKey.json
+server/pids/
+server/*.pid
+server/*.seed
+server/*.pid.lock
+server/lib-cov/
+server/coverage/
+server/.nyc_output
+server/.cache/
+server/.parcel-cache/
+server/.next/
+server/out/
+
+# [Misc / AI Tools]
+.agent/
+.gemini/
+scripts/seedNhacCuaTui.js.bak
+scripts/seedExtra.js.bak
+.agent
