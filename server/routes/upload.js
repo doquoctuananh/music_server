@@ -12,6 +12,8 @@ const Album = require("../models/album");
 const Artist = require("../models/artist");
 const ApiResponse = require("../src/utils/apiResponse");
 const { asyncHandler, authenticate, requireAdmin } = require("../src/middleware");
+const supabaseClient = require("../src/utils/supabaseClient");
+const Song = require("../models/song");
 
 // ── Multer Storage Configuration ──────────────────────────────────────
 // Combine both storage for fields (MP3 + Image)
@@ -132,7 +134,22 @@ router.post(
           ? category.split(",").map((c) => c.trim())
           : [category];
 
-      // Create song
+      // Upload audio to Supabase
+      const localPath = path.join(__dirname, "../public/mp3", songFile.filename);
+      const destPath = `${Date.now()}_${songFile.filename}`;
+      let uploaded = null;
+      try {
+        uploaded = await supabaseClient.uploadFile(localPath, destPath);
+      } catch (err) {
+        // Clean up local files and return error
+        if (songFile?.path) fs.unlink(songFile.path, () => {});
+        if (imageFile?.path) fs.unlink(imageFile.path, () => {});
+        return ApiResponse.error(res, `Supabase upload error: ${err.message || err}`, 500);
+      } finally {
+        try { if (fs.existsSync(localPath)) fs.unlinkSync(localPath); } catch (e) {}
+      }
+
+      // Create song record with Supabase URL
       const song = await Song.create({
         name,
         artist: artistArray,
@@ -140,7 +157,8 @@ router.post(
         language,
         category: categoryArray,
         imageURL: `/images/songs/${imageFile.filename}`,
-        songURL: `/mp3/${songFile.filename}`,
+        songUrl: uploaded.publicUrl,
+        storagePath: uploaded.storagePath,
         duration: duration ? parseInt(duration) : 0,
         lyrics: lyrics || "",
         isPublic: true,
@@ -155,7 +173,7 @@ router.post(
           artist: song.artist,
           album: song.album,
           imageURL: song.imageURL,
-          songURL: song.songURL,
+          songUrl: song.songUrl,
           duration: song.duration
         },
         "Song uploaded successfully"
@@ -189,15 +207,17 @@ router.delete(
       return ApiResponse.notFound(res, "Song not found");
     }
 
-    // Delete files from disk
+    // Delete files from storage/disk
+    if (song.storagePath) {
+      try { await supabaseClient.removeFile(song.storagePath); } catch (err) { console.warn(err); }
+    } else if (song.songUrl) {
+      const songPath = path.join(__dirname, "../public", song.songUrl);
+      fs.unlink(songPath, () => {});
+    }
+
     if (song.imageURL) {
       const imagePath = path.join(__dirname, "../public", song.imageURL);
       fs.unlink(imagePath, () => {}); // Non-blocking delete
-    }
-
-    if (song.songURL) {
-      const songPath = path.join(__dirname, "../public", song.songURL);
-      fs.unlink(songPath, () => {}); // Non-blocking delete
     }
 
     // Delete from DB
@@ -287,12 +307,26 @@ router.put(
     // Update audio if new file uploaded
     if (req.files?.songFile) {
       const songFile = req.files.songFile[0];
-      // Delete old audio
-      if (song.songURL) {
-        const oldSongPath = path.join(__dirname, "../public", song.songURL);
+      const localPath = path.join(__dirname, "../public/mp3", songFile.filename);
+      const destPath = `${Date.now()}_${songFile.filename}`;
+
+      // Remove old supabase file if exists
+      if (song.storagePath) {
+        try { await supabaseClient.removeFile(song.storagePath); } catch (err) { console.warn(err); }
+      } else if (song.songUrl) {
+        const oldSongPath = path.join(__dirname, "../public", song.songUrl);
         fs.unlink(oldSongPath, () => {});
       }
-      song.songURL = `/mp3/${songFile.filename}`;
+
+      try {
+        const uploaded = await supabaseClient.uploadFile(localPath, destPath);
+        song.songUrl = uploaded.publicUrl;
+        song.storagePath = uploaded.storagePath;
+      } catch (err) {
+        return ApiResponse.error(res, `Supabase upload error: ${err.message || err}`, 500);
+      } finally {
+        try { if (fs.existsSync(localPath)) fs.unlinkSync(localPath); } catch (e) {}
+      }
     }
 
     await song.save();
@@ -305,7 +339,7 @@ router.put(
         artist: song.artist,
         album: song.album,
         imageURL: song.imageURL,
-        songURL: song.songURL,
+        songUrl: song.songUrl,
         duration: song.duration
       },
       "Song updated successfully"

@@ -264,17 +264,17 @@ export default function AdminSongs() {
       key: 'category',
       render: (category) => category || '-',
     },
-    {
-      title: 'Thời Lượng',
-      dataIndex: 'duration',
-      key: 'duration',
-      render: (duration) => {
-        if (!duration) return '-';
-        const minutes = Math.floor(duration / 60);
-        const seconds = duration % 60;
-        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-      },
-    },
+    // {
+    //   title: 'Thời Lượng',
+    //   dataIndex: 'duration',
+    //   key: 'duration',
+    //   render: (duration) => {
+    //     if (!duration) return '-';
+    //     const minutes = Math.floor(duration / 60);
+    //     const seconds = duration % 60;
+    //     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    //   },
+    // },
     {
       title: 'Ngày Tạo',
       dataIndex: 'createdAt',
@@ -688,12 +688,13 @@ export default function AdminSongs() {
             </Row>
 
             <Row gutter={16}>
-              <Col span={12}>
+              <Col span={24}>
                 <Form.Item
                   label="Album (Tùy chọn)"
                   name="album"
                 >
                   <Select
+                    style={{ width: '100%' }}
                     placeholder="Chọn album"
                     allowClear
                     options={albums.map(album => ({ label: album.name, value: album._id }))}
@@ -701,14 +702,14 @@ export default function AdminSongs() {
                   />
                 </Form.Item>
               </Col>
-              <Col span={12}>
+              {/* <Col span={12}>
                 <Form.Item
                   label="Thời Lượng (giây) (Tùy chọn)"
                   name="duration"
                 >
                   <InputNumber placeholder="180" min="0" style={{ width: '100%' }} />
                 </Form.Item>
-              </Col>
+              </Col> */}
             </Row>
 
             <Row gutter={16}>
@@ -865,12 +866,13 @@ export default function AdminSongs() {
             </Row>
 
             <Row gutter={16}>
-              <Col span={12}>
+              <Col span={24}>
                 <Form.Item
                   label="Album (Tùy chọn)"
                   name="album"
                 >
                   <Select
+                    style={{ width: '100%' }}
                     placeholder="Chọn album"
                     allowClear
                     options={albums.map(album => ({ label: album.name, value: album._id }))}
@@ -878,14 +880,14 @@ export default function AdminSongs() {
                   />
                 </Form.Item>
               </Col>
-              <Col span={12}>
+              {/* <Col span={12}>
                 <Form.Item
                   label="Thời Lượng (giây) (Tùy chọn)"
                   name="duration"
                 >
                   <InputNumber placeholder="180" min="0" style={{ width: '100%' }} />
                 </Form.Item>
-              </Col>
+              </Col> */}
             </Row>
 
             <Row gutter={16}>
@@ -1022,7 +1024,7 @@ export default function AdminSongs() {
                 <Col span={8}>
                   {viewingSong.imageURL && (
                     <img 
-                      src={`http://localhost:4000${viewingSong.imageURL}`}
+                      src={viewingSong.imageURL?.startsWith('http') ? viewingSong.imageURL : `http://localhost:4000${viewingSong.imageURL}`}
                       alt={viewingSong.name}
                       style={{ width: '100%', borderRadius: '8px' }}
                     />
@@ -1041,13 +1043,13 @@ export default function AdminSongs() {
                   <div style={{ marginBottom: '12px' }}>
                     <strong>Thể Loại:</strong> {Array.isArray(viewingSong.category) ? viewingSong.category.join(', ') : viewingSong.category || '-'}
                   </div>
-                  <div style={{ marginBottom: '12px' }}>
+                  {/* <div style={{ marginBottom: '12px' }}>
                     <strong>Thời Lượng:</strong> {
                       viewingSong.duration 
                         ? `${Math.floor(viewingSong.duration / 60)}:${(viewingSong.duration % 60).toString().padStart(2, '0')}`
                         : '-'
                     }
-                  </div>
+                  </div> */}
                   <div style={{ marginBottom: '12px' }}>
                     <strong>Lượt Phát:</strong> {viewingSong.playCount || 0}
                   </div>
@@ -1065,7 +1067,7 @@ export default function AdminSongs() {
                     controls
                     style={{ width: '100%', marginTop: '8px' }}
                   >
-                    <source src={`http://localhost:4000${viewingSong.songUrl}`} type="audio/mpeg" />
+                    <source src={viewingSong.songUrl?.startsWith('http') ? viewingSong.songUrl : `http://localhost:4000${viewingSong.songUrl}`} type="audio/mpeg" />
                     Trình duyệt của bạn không hỗ trợ phát nhạc.
                   </audio>
                 </div>

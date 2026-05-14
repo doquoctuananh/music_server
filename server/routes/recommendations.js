@@ -67,7 +67,7 @@ router.get(
     }
 
     // Get listened song details
-    const historyIds = history.map((h) => h.songId.toString());
+    const historyIds = history.map((h) => h.song.toString());
     const favouriteIds = user?.favourites || [];
 
     const listenedSongs = allSongs.filter((s) =>

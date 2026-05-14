@@ -7,6 +7,7 @@
 const router = require("express").Router();
 const multer = require("multer");
 const path = require("path");
+const supabaseClient = require("../src/utils/supabaseClient");
 const fs = require("fs");
 const Artist = require("../models/artist");
 const Song = require("../models/song");
@@ -34,6 +35,7 @@ const deleteOldImage = (imageURL) => {
 };
 
 // Multer storage for artist images
+// Multer storage for artist images
 const uploadArtistImage = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => {
@@ -44,13 +46,11 @@ const uploadArtistImage = multer({
       cb(null, uploadDir);
     },
     filename: (req, file, cb) => {
-      const name = file.originalname
-        .replace(/[^a-zA-Z0-9.-]/g, "_")
-        .toLowerCase();
+      const name = file.originalname.replace(/[^a-zA-Z0-9.-]/g, "_").toLowerCase();
       cb(null, `${Date.now()}_${name}`);
     }
   }),
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+  limits: { fileSize: 50 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     if ([".jpg", ".jpeg", ".png", ".webp"].includes(ext)) {
@@ -60,64 +60,6 @@ const uploadArtistImage = multer({
     }
   }
 }).single("imageFile");
-
-/**
- * @route   GET /api/artists/getall?page=1&limit=5
- * @desc    Get all artists with pagination
- * @access  Private (requires Authentication)
- * @headers Authorization: Bearer {token}
- * @query   {
- *   page: Number (default: 1)
- *   limit: Number (default: 5, max: 5)
- * }
- * @response {
- *   data: [artists array (max 5)],
- *   pagination: {
- *     page: Number,
- *     limit: Number,
- *     total: Number,
- *     totalPages: Number,
- *     hasNextPage: Boolean,
- *     hasPrevPage: Boolean
- *   }
- * }
- */
-router.get(
-  "/getall",
-  authenticate,
-  asyncHandler(async (req, res) => {
-    const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.max(1, Math.min(parseInt(req.query.limit) || 5, 5)); // Default: 5, Max: 5
-    const skip = (page - 1) * limit;
-
-    const total = await Artist.countDocuments();
-    const totalPages = Math.ceil(total / limit);
-    const hasNextPage = page < totalPages;
-    const hasPrevPage = page > 1;
-
-    const artists = await Artist.find()
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean();
-
-    return ApiResponse.success(
-      res,
-      {
-        data: artists,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages,
-          hasNextPage,
-          hasPrevPage
-        }
-      },
-      "Artists retrieved successfully"
-    );
-  })
-);
 
 /**
  * @route   GET /api/artists/getone/:id
@@ -157,6 +99,45 @@ router.get(
     );
   })
 );
+
+  /**
+   * @route   GET /api/artists/getall?page=1&limit=5
+   * @desc    Get all artists with pagination (public)
+   * @access  Public
+   */
+  router.get(
+    "/getall",
+    asyncHandler(async (req, res) => {
+      const page = Math.max(1, parseInt(req.query.page) || 1);
+      const limit = Math.max(1, Math.min(parseInt(req.query.limit) || 5, 50));
+      const skip = (page - 1) * limit;
+
+      const total = await Artist.countDocuments();
+      const artists = await Artist.find()
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean();
+
+      const totalPages = Math.ceil(total / limit);
+
+      return ApiResponse.success(
+        res,
+        {
+          data: artists,
+          pagination: {
+            page,
+            limit,
+            total,
+            totalPages,
+            hasNextPage: page < totalPages,
+            hasPrevPage: page > 1,
+          },
+        },
+        "Artists retrieved successfully"
+      );
+    })
+  );
 
 /**
  * @route   POST /api/artists/add

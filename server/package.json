@@ -15,6 +15,7 @@
     "tr46": "^6.0.0"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.105.4",
     "axios": "^1.13.2",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",

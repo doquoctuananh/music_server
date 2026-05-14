@@ -15,6 +15,7 @@ const Album = require("../models/album");
 const User = require("../models/user");
 const ApiResponse = require("../src/utils/apiResponse");
 const { asyncHandler, authenticate, requireAdmin, requireMember } = require("../src/middleware");
+const supabaseClient = require("../src/utils/supabaseClient");
 
 /**
  * Helper function to delete old file
@@ -704,11 +705,31 @@ router.post(
     // Validate file uploads
     let songUrl = "";
     let imageUrl = "";
+    let storagePath = null;
 
     if (!req.files || !req.files.songFile || req.files.songFile.length === 0) {
       errors.songFile = "File audio (MP3/MP4) là bắt buộc";
     } else {
-      songUrl = `/mp3/${req.files.songFile[0].filename}`;
+      // Upload the song file to Supabase, then remove local copy
+      const songFile = req.files.songFile[0];
+      const localPath = path.join(__dirname, "../public/mp3", songFile.filename);
+      const destPath = `${Date.now()}_${songFile.filename}`;
+
+      try {
+        const result = await supabaseClient.uploadFile(localPath, destPath);
+        if (!result || !result.publicUrl) {
+          return ApiResponse.error(res, "Failed to upload song to storage", 500);
+        }
+        songUrl = result.publicUrl;
+        storagePath = result.storagePath;
+      } catch (err) {
+        return ApiResponse.error(res, `Supabase upload error: ${err.message || err}`, 500);
+      } finally {
+        // Remove local temp file
+        try {
+          if (fs.existsSync(localPath)) fs.unlinkSync(localPath);
+        } catch (e) { /* ignore */ }
+      }
     }
 
     if (!req.files || !req.files.imageFile || req.files.imageFile.length === 0) {
@@ -754,6 +775,7 @@ router.post(
       category: category.trim(),
       duration: duration || 0,
       songUrl,
+      storagePath,
       imageURL: imageUrl,
       playCount: 0
     };
@@ -845,11 +867,31 @@ router.put(
     if (req.files) {
       // Update song file if uploaded
       if (req.files.songFile && req.files.songFile.length > 0) {
-        // Delete old song file if exists
-        if (song.songUrl) {
+        const songFile = req.files.songFile[0];
+        const localPath = path.join(__dirname, "../public/mp3", songFile.filename);
+        const destPath = `${Date.now()}_${songFile.filename}`;
+
+        // Remove old supabase file if exists
+        if (song.storagePath) {
+          try {
+            await supabaseClient.removeFile(song.storagePath);
+          } catch (err) {
+            console.warn('Failed to remove old supabase file:', err.message || err);
+          }
+        } else if (song.songUrl) {
+          // If previous song was local path, try to remove local file
           deleteOldFile(song.songUrl);
         }
-        song.songUrl = `/mp3/${req.files.songFile[0].filename}`;
+
+        try {
+          const result = await supabaseClient.uploadFile(localPath, destPath);
+          song.songUrl = result.publicUrl;
+          song.storagePath = result.storagePath;
+        } catch (err) {
+          return ApiResponse.error(res, `Supabase upload error: ${err.message || err}`, 500);
+        } finally {
+          try { if (fs.existsSync(localPath)) fs.unlinkSync(localPath); } catch (e) { }
+        }
       }
 
       // Update image file if uploaded
@@ -911,12 +953,34 @@ router.put(
       return ApiResponse.error(res, "Song file is required", 400);
     }
 
-    // Delete old song file if exists
-    if (song.songUrl) {
+    // Delete old supabase file if exists (or local file)
+    if (song.storagePath) {
+      try {
+        await supabaseClient.removeFile(song.storagePath);
+      } catch (err) {
+        console.warn('Failed to remove old supabase file:', err.message || err);
+      }
+    } else if (song.songUrl) {
+      // previous local file
       deleteOldFile(song.songUrl);
     }
 
-    song.songUrl = `/mp3/${req.file.filename}`;
+    // Upload new file to Supabase and remove local copy
+    const localPath = path.join(__dirname, "../public/mp3", req.file.filename);
+    const destPath = `${Date.now()}_${req.file.filename}`;
+    try {
+      const result = await supabaseClient.uploadFile(localPath, destPath);
+      if (!result || !result.publicUrl) {
+        return ApiResponse.error(res, "Failed to upload song to storage", 500);
+      }
+      song.songUrl = result.publicUrl;
+      song.storagePath = result.storagePath;
+    } catch (err) {
+      return ApiResponse.error(res, `Supabase upload error: ${err.message || err}`, 500);
+    } finally {
+      try { if (fs.existsSync(localPath)) fs.unlinkSync(localPath); } catch (e) { }
+    }
+
     await song.save();
 
     return ApiResponse.success(
@@ -1005,12 +1069,18 @@ router.delete(
       return ApiResponse.notFound(res, "Song not found");
     }
 
-    // Delete song file if exists
-    if (song.songUrl) {
+    // Delete song file if exists (Supabase or local)
+    if (song.storagePath) {
+      try {
+        await supabaseClient.removeFile(song.storagePath);
+      } catch (err) {
+        console.warn('Failed to remove supabase file:', err.message || err);
+      }
+    } else if (song.songUrl) {
       deleteOldFile(song.songUrl);
     }
 
-    // Delete image file if exists
+    // Delete image file if exists (local images only)
     if (song.imageURL) {
       deleteOldImage(song.imageURL);
     }

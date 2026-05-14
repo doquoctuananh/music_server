@@ -5,6 +5,7 @@ const songSchema = new mongoose.Schema(
     name: { type: String, required: true },
     imageURL: { type: String },
     songUrl: { type: String },
+    storagePath: { type: String },
     album: { type: mongoose.Schema.Types.ObjectId, ref: "Album" },
     artist: [{ type: mongoose.Schema.Types.ObjectId, ref: "Artist" }],
     language: { type: String },
