@@ -1,9 +1,10 @@
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { API, API_ORIGIN } from "@/constants/api";
+import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -33,6 +34,8 @@ export default function HomeScreen() {
   const [artistMap, setArtistMap] = useState<
     Record<string, { name: string; imageURL?: string }>
   >({});
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [recLoading, setRecLoading] = useState(false);
 
   const filteredSongs = songs.filter((s) =>
     (s.name || "").toLowerCase().includes((search || "").toLowerCase()),
@@ -124,6 +127,37 @@ export default function HomeScreen() {
     };
   }, [songs]);
 
+  // fetch recommendations on screen focus
+  const fetchRecommendations = useCallback(async () => {
+    setRecLoading(true);
+    try {
+      const token = await SecureStore.getItemAsync("auth_token");
+      const res = await fetch(`${API}/recommendations`, {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+          Accept: "application/json",
+        },
+      });
+      const json = await res.json();
+      if (json?.success && json.data?.songs) {
+        setRecommendations(json.data.songs || []);
+      } else {
+        setRecommendations([]);
+      }
+    } catch (e) {
+      console.error("Fetch recommendations error", e);
+      setRecommendations([]);
+    } finally {
+      setRecLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchRecommendations();
+    }, [fetchRecommendations]),
+  );
+
   const renderItem = ({ item }: { item: any }) => {
     const imageUri = item.imageURL?.startsWith("http")
       ? item.imageURL
@@ -208,6 +242,92 @@ export default function HomeScreen() {
               );
             })}
           </ScrollView>
+
+          {recLoading ? (
+            <ActivityIndicator style={{ marginTop: 12 }} />
+          ) : recommendations.length > 0 ? (
+            <View style={{ marginTop: 12 }}>
+              <ThemedText type="subtitle">Gợi ý cho bạn</ThemedText>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={{ marginTop: 8 }}
+              >
+                {recommendations.map((r) => {
+                  const imageUri = r.imageURL?.startsWith("http")
+                    ? r.imageURL
+                    : `${API_ORIGIN}${r.imageURL}`;
+                  return (
+                    <Card
+                      key={r._id}
+                      style={styles.recCard}
+                      onPress={async () => {
+                        try {
+                          const token =
+                            await SecureStore.getItemAsync("auth_token");
+
+                          // fire-and-forget: add to history
+                          try {
+                            fetch(`${API}/history/add`, {
+                              method: "POST",
+                              headers: {
+                                Authorization: token ? `Bearer ${token}` : "",
+                                "Content-Type": "application/json",
+                                Accept: "application/json",
+                              },
+                              body: JSON.stringify({ song: r._id }),
+                            }).catch((err) =>
+                              console.error("Add history failed", err),
+                            );
+                          } catch (e) {
+                            console.error("Add history failed", e);
+                          }
+
+                          router.push({
+                            pathname: "/player",
+                            params: {
+                              id: r._id,
+                              name: r.name,
+                              songUrl: r.songUrl || r.songURL || "",
+                              imageURL: r.imageURL || "",
+                              artist: (r.artist || []).join(", "),
+                            },
+                          });
+                        } catch (e) {
+                          console.error("Recommendation press error", e);
+                          router.push({
+                            pathname: "/player",
+                            params: {
+                              id: r._id,
+                              name: r.name,
+                              songUrl: r.songUrl || r.songURL || "",
+                              imageURL: r.imageURL || "",
+                              artist: (r.artist || []).join(", "),
+                            },
+                          });
+                        }
+                      }}
+                    >
+                      <View style={styles.recOverlay}>
+                        <Text style={styles.recOverlayText}>Gợi ý</Text>
+                      </View>
+                      {r.imageURL ? (
+                        <Card.Cover
+                          source={{ uri: imageUri }}
+                          style={styles.recCover}
+                        />
+                      ) : null}
+                      <Card.Content>
+                        <Text numberOfLines={1} style={styles.recTitle}>
+                          {r.name}
+                        </Text>
+                      </Card.Content>
+                    </Card>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          ) : null}
 
           <View style={[styles.sectionHeader, { marginTop: 8 }]}>
             <ThemedText type="title">Bài hát</ThemedText>
@@ -381,6 +501,32 @@ const styles = StyleSheet.create({
   cover: { width: "100%", height: 160, backgroundColor: "#eee" },
   cardContent: { padding: 8 },
   artistText: { color: "#666", marginTop: 4 },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  recCard: {
+    width: 160,
+    marginRight: 12,
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: "#fff",
+    position: "relative",
+  },
+  recCover: { width: 160, height: 110, backgroundColor: "#eee" },
+  recOverlay: {
+    position: "absolute",
+    top: 8,
+    left: 8,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+    zIndex: 10,
+  },
+  recOverlayText: { color: "#fff", fontSize: 12 },
+  recTitle: { marginTop: 6, color: "#000", fontWeight: "600" },
   pager: {
     flexDirection: "row",
     justifyContent: "space-between",

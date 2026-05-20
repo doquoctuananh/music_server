@@ -1,6 +1,7 @@
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { API, API_ORIGIN } from "@/constants/api";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
@@ -15,14 +16,6 @@ import {
   View,
 } from "react-native";
 import { Avatar, IconButton } from "react-native-paper";
-
-const formatTime = (ms: number) => {
-  if (!ms) return "0:00";
-  const total = Math.floor(ms / 1000);
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
-};
 
 export default function PlayerScreen() {
   const params = useLocalSearchParams?.() ?? {};
@@ -264,6 +257,14 @@ export default function PlayerScreen() {
     outputRange: ["0deg", "360deg"],
   });
 
+  const formatTime = (ms: number | null | undefined) => {
+    const n = Number(ms) || 0;
+    const total = Math.floor(n / 1000);
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
   return (
     <ThemedView style={styles.container}>
       <IconButton
@@ -336,24 +337,31 @@ export default function PlayerScreen() {
         </View>
 
         <View style={styles.controls}>
-          <IconButton
-            icon={() => <Text style={styles.seekText}>{"<<"}</Text>}
+          <Pressable
             onPress={async () => {
               if (!soundRef.current) return;
               const status = await soundRef.current.getStatusAsync();
               const newPos = Math.max(0, (status.positionMillis || 0) - 10000);
               await soundRef.current.setPositionAsync(newPos);
             }}
-          />
-          <View style={styles.playButtonContainer}>
-            <IconButton
-              icon={playing ? "pause" : "play"}
-              size={56}
-              onPress={togglePlay}
+            style={[styles.iconCircle, styles.leftIcon]}
+          >
+            <MaterialCommunityIcons
+              name="skip-previous"
+              size={28}
+              color="#fff"
             />
-          </View>
-          <IconButton
-            icon={() => <Text style={styles.seekText}>{">>"}</Text>}
+          </Pressable>
+
+          <Pressable onPress={togglePlay} style={styles.playCircle}>
+            <MaterialCommunityIcons
+              name={playing ? "pause-circle" : "play-circle"}
+              size={64}
+              color="#fff"
+            />
+          </Pressable>
+
+          <Pressable
             onPress={async () => {
               if (!soundRef.current) return;
               const status = await soundRef.current.getStatusAsync();
@@ -363,7 +371,44 @@ export default function PlayerScreen() {
               );
               await soundRef.current.setPositionAsync(newPos);
             }}
-          />
+            style={[styles.iconCircle, styles.rightIcon]}
+          >
+            <MaterialCommunityIcons name="skip-next" size={28} color="#fff" />
+          </Pressable>
+          <Pressable
+            onPress={async () => {
+              try {
+                const token = await SecureStore.getItemAsync("auth_token");
+                const q = songId
+                  ? `?excludeId=${encodeURIComponent(songId)}`
+                  : "";
+                const res = await fetch(`${API}/songs/random${q}`, {
+                  headers: { Authorization: token ? `Bearer ${token}` : "" },
+                });
+                const json = await res.json();
+                if (json?.success && json.data) {
+                  const s = json.data;
+                  router.replace({
+                    pathname: "/player",
+                    params: {
+                      id: s._id,
+                      name: s.name,
+                      songUrl: s.songUrl || s.songURL || "",
+                      imageURL: s.imageURL || "",
+                      artist: (s.artist || []).join(", "),
+                    },
+                  });
+                } else {
+                  console.error("Random song not available", json);
+                }
+              } catch (e) {
+                console.error("Fetch random song failed", e);
+              }
+            }}
+            style={[styles.iconCircle, styles.shuffleIcon]}
+          >
+            <MaterialCommunityIcons name="shuffle" size={22} color="#fff" />
+          </Pressable>
         </View>
         <Modal
           visible={confirmAction !== null}
@@ -429,6 +474,30 @@ const styles = StyleSheet.create({
   },
   avatarIcon: { backgroundColor: "#444" },
   controls: { flexDirection: "row", alignItems: "center", marginTop: 24 },
+  iconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#1f2937",
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.14,
+    shadowRadius: 12,
+  },
+  leftIcon: { marginRight: 18 },
+  rightIcon: { marginLeft: 18 },
+  playCircle: {
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
+  },
+  shuffleIcon: { marginLeft: 10, backgroundColor: "#0ea5a4" },
   progressRow: {
     width: "100%",
     flexDirection: "row",
@@ -450,6 +519,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   seekText: { color: "#fff", fontSize: 22, fontWeight: "700" },
+  seekButton: {
+    borderRadius: 999,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+  },
   heart: { fontSize: 22, color: "#ccc" },
   heartActive: { color: "#e0245e" },
   modalButton: {

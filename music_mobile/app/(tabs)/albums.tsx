@@ -6,12 +6,12 @@ import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import {
-    ActivityIndicator,
-    Appbar,
-    Avatar,
-    Card,
-    IconButton,
-    List,
+  ActivityIndicator,
+  Appbar,
+  Avatar,
+  Card,
+  IconButton,
+  List,
 } from "react-native-paper";
 
 export default function AlbumsScreen() {
@@ -122,14 +122,18 @@ export default function AlbumsScreen() {
               showsHorizontalScrollIndicator={false}
               style={{ marginBottom: 12 }}
             >
-              {albums.map((alb) => {
+              {albums.map((alb, idx) => {
                 const imageUri = alb.imageURL?.startsWith("http")
                   ? alb.imageURL
                   : `${API_ORIGIN}${alb.imageURL}`;
+                const bg = idx % 2 === 0 ? "#ffffff" : "#cfe2ff";
                 return (
                   <Card
                     key={alb._id}
-                    style={[styles.card, { width: 200, marginRight: 12 }]}
+                    style={[
+                      styles.card,
+                      { width: 200, marginRight: 12, backgroundColor: bg },
+                    ]}
                     onPress={() => {
                       setSelectedAlbum(alb);
                       setAlbumSongsPage(1);
@@ -141,13 +145,15 @@ export default function AlbumsScreen() {
                         style={styles.cover}
                       />
                     ) : null}
-                    <Card.Content>
-                      <ThemedText
-                        type="title"
-                        style={{ color: "#222", fontWeight: "500" }}
-                      >
+                    <Card.Content style={styles.cardContent}>
+                      <ThemedText type="title" style={styles.albumTitle}>
                         {alb.name}
                       </ThemedText>
+                      {alb.description ? (
+                        <Text style={styles.albumSubtitle} numberOfLines={2}>
+                          {alb.description}
+                        </Text>
+                      ) : null}
                     </Card.Content>
                   </Card>
                 );
@@ -332,11 +338,25 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   card: {
     marginBottom: 12,
-    backgroundColor: "#fff",
-    borderRadius: 8,
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
     overflow: "hidden",
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
   },
-  cover: { width: "100%", height: 120, backgroundColor: "#eee" },
+  cover: {
+    width: "100%",
+    height: 140,
+    backgroundColor: "#eee",
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  cardContent: { paddingVertical: 12, paddingHorizontal: 10 },
+  albumTitle: { color: "#062a78", fontSize: 16, fontWeight: "700" },
+  albumSubtitle: { color: "#333", fontSize: 12, marginTop: 6 },
   artistText: { color: "#666", marginTop: 4 },
   pager: {
     flexDirection: "row",

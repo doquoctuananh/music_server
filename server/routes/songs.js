@@ -245,6 +245,35 @@ router.get(
 );
 
 /**
+ * @route   GET /api/songs/random?excludeId=...
+ * @desc    Get a random song excluding the currently playing song
+ * @access  Private (member)
+ */
+router.get(
+  "/random",
+  authenticate,
+  requireMember,
+  asyncHandler(async (req, res) => {
+    const { excludeId } = req.query;
+
+    const query = {};
+    if (excludeId && mongoose.Types.ObjectId.isValid(excludeId)) {
+      query._id = { $ne: new mongoose.Types.ObjectId(excludeId) };
+    }
+
+    const total = await Song.countDocuments(query);
+    if (total === 0) {
+      return ApiResponse.notFound(res, "No other songs available");
+    }
+
+    const rand = Math.floor(Math.random() * total);
+    const song = await Song.findOne(query).skip(rand).lean();
+
+    return ApiResponse.success(res, song, "Random song retrieved successfully");
+  })
+);
+
+/**
  * @route   GET /api/songs/search?q=keyword&page=1&limit=6
  * @desc    Search songs by name with pagination (6 songs per page)
  * @access  Private (requires authentication - admin or member)
